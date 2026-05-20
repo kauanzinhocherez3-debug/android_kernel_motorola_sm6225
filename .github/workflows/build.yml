@@ -3,23 +3,12 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # Remove o aviso do Node.js
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
     - name: Baixar Codigo
       uses: actions/checkout@v4
-
-    - name: Configurar Ferramentas e Clang do Google (AOSP)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y bc build-essential libssl-dev libcrypto++-dev bison flex libelf-dev lld llvm
-        
-        # Baixando uma versão ultra-compatível do Clang do Android (r450784d)
-        mkdir -p $GITHUB_WORKSPACE/aosp-clang
-        cd $GITHUB_WORKSPACE/aosp-clang
-        wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r450784d.tar.gz
-        tar -xf clang-r450784d.tar.gz
 
     - name: Injetar KernelSU
       run: |
@@ -30,17 +19,13 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # Colocando o Clang do Google no caminho do sistema
-        export PATH="$GITHUB_WORKSPACE/aosp-clang/bin:$PATH"
+        # Ignora checagens chatas de versão do script da LineageOS
+        export KBUILD_BUILD_HOST=github-actions
+        export KBUILD_BUILD_USER=builder
         
-        # Bula do gato: criamos arquivos fantasmas para enganar a checagem de versão antiga, se houver
-        ln -sf $(which ld.lld) $GITHUB_WORKSPACE/aosp-clang/bin/ld.lld
-        
-        # Gerando a configuração do Moto G42
+        # Gera a configuração e compila usando o Clang nativo que JÁ ESTÁ pronto no GitHub
         make vendor/hawao_defconfig
-        
-        # Compilação forçando os parâmetros corretos do LLVM/Clang do Google
-        make CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
+        make CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- -j$(nproc)
 
     - name: Guardar Kernel Pronto
       uses: actions/upload-artifact@v4
