@@ -9,8 +9,6 @@ jobs:
     steps:
     - name: Baixar Codigo
       uses: actions/checkout@v4
-      with:
-        ref: lineage-20
 
     - name: Configurar Ferramentas e Clang do Google (AOSP)
       run: |
@@ -36,8 +34,8 @@ jobs:
         # Força o uso do linkador correto
         ln -sf $(which ld.lld) $GITHUB_WORKSPACE/aosp-clang/bin/ld.lld
         
-        # Tenta aplicar a config hawao ou a bengal (base da Motorola para esse chip)
-        make hawao_defconfig || make vendor/bengal_defconfig || make bengal_defconfig
+        # Tenta aplicar as configs válidas para a árvore do SM6225
+        make hawao_defconfig || make vendor/hawao_defconfig || make vendor/bengal_defconfig || make bengal_defconfig
         
         # Compilação com as ferramentas do Google
         make CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
