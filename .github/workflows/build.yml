@@ -3,12 +3,25 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
     - name: Baixar Codigo
       uses: actions/checkout@v4
+      with:
+        ref: lineage-20
+
+    - name: Configurar Ferramentas e Clang do Google (AOSP)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc build-essential libssl-dev libcrypto++-dev bison flex libelf-dev lld llvm
+        
+        # Baixando o Clang oficial do Android para evitar erro de assembler
+        mkdir -p $GITHUB_WORKSPACE/aosp-clang
+        cd $GITHUB_WORKSPACE/aosp-clang
+        wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r450784d.tar.gz
+        tar -xf clang-r450784d.tar.gz
 
     - name: Injetar KernelSU
       run: |
@@ -18,14 +31,16 @@ jobs:
       run: |
         export ARCH=arm64
         export SUBARCH=arm64
+        export PATH="$GITHUB_WORKSPACE/aosp-clang/bin:$PATH"
         
-        # Ignora checagens chatas de versão do script da LineageOS
-        export KBUILD_BUILD_HOST=github-actions
-        export KBUILD_BUILD_USER=builder
+        # Força o uso do linkador correto
+        ln -sf $(which ld.lld) $GITHUB_WORKSPACE/aosp-clang/bin/ld.lld
         
-        # Gera a configuração e compila usando o Clang nativo que JÁ ESTÁ pronto no GitHub
-        make vendor/hawao_defconfig
-        make CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- -j$(nproc)
+        # Tenta aplicar a config hawao ou a bengal (base da Motorola para esse chip)
+        make hawao_defconfig || make vendor/bengal_defconfig || make bengal_defconfig
+        
+        # Compilação com as ferramentas do Google
+        make CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
 
     - name: Guardar Kernel Pronto
       uses: actions/upload-artifact@v4
