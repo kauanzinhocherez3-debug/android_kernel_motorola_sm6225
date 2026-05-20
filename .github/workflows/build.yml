@@ -19,13 +19,16 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # Força o kernel a aceitar o compilador nativo do GitHub
-        export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+        # Cria arquivos de checagem para o script da LineageOS não reclamar do compilador nativo
+        mkdir -p bin
+        ln -sf /usr/bin/clang bin/clang
+        ln -sf /usr/bin/ld.lld bin/ld.lld
+        export PATH=$(pwd)/bin:$PATH
         
-        # Tenta aplicar as configs da Motorola
+        # Força a configuração da árvore do Moto G42
         make hawao_defconfig || make vendor/hawao_defconfig || make vendor/bengal_defconfig || make bengal_defconfig
         
-        # Compila direto com o Clang que já está na máquina do GitHub
+        # Compila com as ferramentas nativas que já estão na máquina
         make CC=clang LD=ld.lld CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
 
     - name: Guardar Kernel Pronto
